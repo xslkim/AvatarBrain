@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AvatarBrain 对话测试</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3d8bfd;
+      --accent-dim: #265a9e;
+      --danger: #e85d5d;
+      --ok: #3ecf8e;
+      --user: #7eb8ff;
+      --bot: #c4f0c5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 2rem;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 0.25rem;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.75rem;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    .row:last-child { margin-bottom: 0; }
+    label { color: var(--muted); font-size: 0.8rem; margin-right: 0.25rem; }
+    input[type="text"] {
+      flex: 1;
+      min-width: 200px;
+      padding: 0.45rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    button {
+      padding: 0.45rem 0.9rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: #243044;
+    }
+    button.primary {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    button.danger {
+      border-color: #8b4545;
+      color: #ffb4b4;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .status-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .status-dot.busy { background: #e6c229; }
+    .status-dot.err { background: var(--danger); }
+    .mono {
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      max-height: 220px;
+      overflow: auto;
+      margin: 0;
+    }
+    .chat {
+      min-height: 200px;
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 0.5rem 0;
+    }
+    .msg {
+      margin-bottom: 0.85rem;
+      padding: 0.5rem 0.65rem;
+      border-radius: 8px;
+      border-left: 3px solid var(--border);
+      background: rgba(0,0,0,0.2);
+    }
+    .msg.user { border-left-color: var(--user); }
+    .msg.assistant { border-left-color: var(--bot); }
+    .msg .role {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+    }
+    textarea#input {
+      width: 100%;
+      min-height: 72px;
+      resize: vertical;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: inherit;
+    }
+    textarea#input:focus { outline: none; border-color: var(--accent); }
+    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>AvatarBrain 对话测试</h1>
+    <p class="sub">通过 WebSocket 与大脑服务交互；请先启动服务，再连接并发送消息。须等待本轮 <code>done</code> 后再发下一条。</p>
+
+    <div class="panel">
+      <div class="row">
+        <span><span class="status-dot" id="wsDot"></span><span id="wsLabel">未连接</span></span>
+        <span><span class="status-dot" id="healthDot"></span><span id="healthLabel">健康检查未执行</span></span>
+      </div>
+      <div class="row">
+        <label for="baseUrl">HTTP 基址</label>
+        <input type="text" id="baseUrl" placeholder="留空则用当前页面来源，例如 http://127.0.0.1:8019" autocomplete="off" />
+      </div>
+      <div class="row">
+        <button type="button" id="btnConnect">连接</button>
+        <button type="button" id="btnDisconnect" disabled>断开</button>
+        <button type="button" id="btnHealth">请求 /health</button>
+        <button type="button" class="danger" id="btnReset" disabled>重置会话 (reset)</button>
+      </div>
+      <p class="mono" id="healthOut" hidden></p>
+    </div>
+
+    <div class="panel">
+      <div class="chat" id="chat"></div>
+      <textarea id="input" placeholder="输入用户问题…"></textarea>
+      <div class="row" style="margin-top:0.75rem;margin-bottom:0;">
+        <button type="button" class="primary" id="btnSend" disabled>发送 user_input</button>
+        <span class="hint" id="sendHint">连接后可发送</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="margin-bottom:0.5rem;"><strong>原始消息日志</strong></div>
+      <pre class="mono" id="log"></pre>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const chatEl = $("chat");
+  const logEl = $("log");
+  const wsDot = $("wsDot");
+  const wsLabel = $("wsLabel");
+  const healthDot = $("healthDot");
+  const healthLabel = $("healthLabel");
+  const healthOut = $("healthOut");
+  const baseUrlInput = $("baseUrl");
+  const btnConnect = $("btnConnect");
+  const btnDisconnect = $("btnDisconnect");
+  const btnHealth = $("btnHealth");
+  const btnReset = $("btnReset");
+  const btnSend = $("btnSend");
+  const inputEl = $("input");
+  const sendHint = $("sendHint");
+
+  let ws = null;
+  let streaming = false;
+  let assistantBubble = null;
+
+  function log(line) {
+    const t = new Date().toISOString().slice(11, 23);
+    logEl.textContent += `[${t}] ${line}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function resolveBase() {
+    const raw = (baseUrlInput.value || "").trim();
+    if (raw) {
+      return raw.startsWith("http://") || raw.startsWith("https://") ? raw : "http://" + raw;
+    }
+    return window.location.origin;
+  }
+
+  function wsUrlFromBase(httpBase) {
+    const u = new URL(httpBase);
+    const proto = u.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${u.host}/ws/chat`;
+  }
+
+  function setWsUi(connected) {
+    wsDot.className = "status-dot" + (connected ? " on" : "");
+    wsLabel.textContent = connected ? "WebSocket 已连接" : "未连接";
+    btnConnect.disabled = connected;
+    btnDisconnect.disabled = !connected;
+    btnReset.disabled = !connected;
+    updateSendState();
+  }
+
+  function updateSendState() {
+    const ok = ws && ws.readyState === WebSocket.OPEN && !streaming;
+    btnSend.disabled = !ok;
+    sendHint.textContent = !ws || ws.readyState !== WebSocket.OPEN
+      ? "请先连接"
+      : streaming
+        ? "正在生成回复，请等待 done…"
+        : "可发送";
+  }
+
+  function appendUser(text) {
+    const div = document.createElement("div");
+    div.className = "msg user";
+    div.innerHTML = '<div class="role">用户</div><div class="body"></div>';
+    div.querySelector(".body").textContent = text;
+    chatEl.appendChild(div);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  function startAssistant() {
+    assistantBubble = document.createElement("div");
+    assistantBubble.className = "msg assistant";
+    assistantBubble.innerHTML = '<div class="role">助手 (流式)</div><div class="body"></div>';
+    chatEl.appendChild(assistantBubble);
+    chatEl.scrollTop = chatEl.scrollHeight;
+    return assistantBubble.querySelector(".body");
+  }
+
+  function appendAssistantChunk(bodyEl, chunk) {
+    bodyEl.textContent += chunk;
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  btnConnect.addEventListener("click", () => {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+    const base = resolveBase();
+    const url = wsUrlFromBase(base);
+    log("CONNECT " + url);
+    ws = new WebSocket(url);
+    streaming = false;
+    assistantBubble = null;
+
+    ws.onopen = () => {
+      log("open");
+      setWsUi(true);
+      healthDot.className = "status-dot";
+      healthLabel.textContent = "可点击「请求 /health」";
+    };
+
+    ws.onclose = (ev) => {
+      log("close code=" + ev.code);
+      ws = null;
+      streaming = false;
+      setWsUi(false);
+      updateSendState();
+    };
+
+    ws.onerror = () => {
+      log("error (see browser devtools)");
+      wsDot.classList.add("err");
+    };
+
+    ws.onmessage = (ev) => {
+      log("<- " + ev.data);
+      let data;
+      try {
+        data = JSON.parse(ev.data);
+      } catch {
+        return;
+      }
+      const type = data.type;
+      if (type === "chunk") {
+        const text = data.text != null ? String(data.text) : "";
+        if (!assistantBubble) startAssistant();
+        const bodyEl = assistantBubble.querySelector(".body");
+        appendAssistantChunk(bodyEl, text);
+      } else if (type === "done") {
+        streaming = false;
+        if (assistantBubble) {
+          assistantBubble.querySelector(".role").textContent = "助手";
+        }
+        assistantBubble = null;
+        updateSendState();
+      } else if (type === "reset_ok") {
+        streaming = false;
+        assistantBubble = null;
+        updateSendState();
+      } else if (type === "error") {
+        streaming = false;
+        assistantBubble = null;
+        updateSendState();
+        const err = document.createElement("div");
+        err.className = "msg";
+        err.style.borderLeftColor = "var(--danger)";
+        err.innerHTML = '<div class="role">错误</div><div class="body"></div>';
+        err.querySelector(".body").textContent = data.message || JSON.stringify(data);
+        chatEl.appendChild(err);
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+    };
+  });
+
+  btnDisconnect.addEventListener("click", () => {
+    if (ws) {
+      log("disconnect (client)");
+      ws.close();
+    }
+  });
+
+  btnReset.addEventListener("click", () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (streaming) {
+      log("skip reset: still streaming");
+      return;
+    }
+    const payload = JSON.stringify({ type: "reset" });
+    log("-> " + payload);
+    ws.send(payload);
+  });
+
+  btnSend.addEventListener("click", () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN || streaming) return;
+    const text = inputEl.value.trim();
+    if (!text) return;
+    const payload = JSON.stringify({ type: "user_input", text: text });
+    log("-> " + payload);
+    appendUser(text);
+    streaming = true;
+    updateSendState();
+    ws.send(payload);
+    inputEl.value = "";
+  });
+
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      btnSend.click();
+    }
+  });
+
+  btnHealth.addEventListener("click", async () => {
+    const base = resolveBase();
+    const url = base.replace(/\/$/, "") + "/health";
+    healthOut.hidden = false;
+    healthLabel.textContent = "请求中…";
+    healthDot.className = "status-dot busy";
+    try {
+      const r = await fetch(url);
+      const j = await r.json();
+      healthOut.textContent = JSON.stringify(j, null, 2);
+      healthDot.className = "status-dot " + (j.ready ? "on" : "err");
+      healthLabel.textContent = j.ready ? "LLM 就绪" : ("未就绪: " + (j.error || ""));
+    } catch (err) {
+      healthDot.className = "status-dot err";
+      healthLabel.textContent = "请求失败";
+      healthOut.textContent = String(err);
+    }
+  });
+
+  if (!baseUrlInput.value) {
+    baseUrlInput.placeholder = "留空 = " + window.location.origin;
+  }
+  setWsUi(false);
+  updateSendState();
+})();
+  </script>
+</body>
+</html>

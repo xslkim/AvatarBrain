@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from config import settings
 from services.llm import LLMService
@@ -14,6 +16,8 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 app = FastAPI(title="AvatarBrain")
 app.add_middleware(
@@ -30,6 +34,13 @@ llm_service = LLMService()
 @app.get("/health")
 async def health():
     return {"status": "ok", **llm_service.health}
+
+
+@app.get("/")
+@app.get("/test")
+async def chat_test_page():
+    """浏览器对话测试页（静态 HTML）。"""
+    return FileResponse(STATIC_DIR / "chat-test.html", media_type="text/html; charset=utf-8")
 
 
 @app.websocket("/ws/chat")
