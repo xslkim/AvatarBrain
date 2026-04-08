@@ -1,18 +1,14 @@
 # AvatarBrain API
 
-流式对话：**WebSocket** 收 JSON，推 `chunk` + `done`。默认端口 **8019**；HTTPS 下 WebSocket 为 **`wss://`**。
-
-| 端点 | 说明 |
-|------|------|
-| `GET /` 、`GET /test` | 浏览器测试页（详见 [README.md](./README.md)） |
-| `GET /health` | 健康与 LLM 状态 |
-| `WebSocket /ws/chat` | 对话 |
+默认端口 **8019**；HTTPS 部署时 WebSocket 使用 **`wss://`**。
 
 ---
 
 ## `GET /health`
 
-示例响应：
+返回服务与 LLM 客户端状态。
+
+**响应示例：**
 
 ```json
 {
@@ -25,35 +21,104 @@
 }
 ```
 
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `status` | string | 固定为 `"ok"` |
+| `ready` | boolean | LLM 客户端是否初始化成功 |
+| `model` | string | 当前使用的模型 ID |
+| `base_url` | string | LLM 网关地址 |
+| `history_items` | integer | 当前历史条数（最大 12） |
+| `error` | string \| null | 最近一次错误信息；无错误时为 `null` |
+
 ---
 
 ## `WebSocket /ws/chat`
 
-**连接**：同一连接内保留至多 **6 轮**（12 条 user/assistant）历史；**断开即清空**。客户端宜保持**单连接**串行发送（见下表「约束」）。
+全双工流式对话。连接内保留最多 **6 轮**（12 条）历史；**断开时自动清空**历史。
 
 ### 客户端 → 服务端
 
-| `type` | 体 | 说明 |
-|--------|-----|------|
-| `user_input` | `text`（非空 string） | 开始流式回复 |
-| `reset` | — | 清空历史；服务端回复 `reset_ok` |
+每条消息为一行 UTF-8 JSON 文本帧。
 
-非 JSON、未知 `type`、或 `text` 为空会收到 `error`。
+#### `user_input` — 发起对话
+
+```json
+{ "type": "user_input", "text": "今天天气怎么样？" }
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `type` | string | `"user_input"` |
+| `text` | string | 用户输入，不能为空 |
+
+服务端依次回复若干 `chunk`，最后回复 `done`。
+
+#### `reset` — 清空历史
+
+```json
+{ "type": "reset" }
+```
+
+服务端回复 `reset_ok`，不调用模型。
+
+---
 
 ### 服务端 → 客户端
 
-| `type` | 体 | 说明 |
-|--------|-----|------|
-| `chunk` | `text` | LLM 增量，需拼接 |
-| `done` | — | 本条 `user_input` 结束 |
-| `reset_ok` | — | 历史已清空 |
-| `error` | `message` | 错误描述 |
+#### `chunk` — 模型增量输出
 
-### 约束
+```json
+{ "type": "chunk", "text": "今天" }
+```
 
-- 等待 **`done`** 后再发下一条 `user_input`。
-- **流式**：按 token/片段逐条 `chunk`，便于 TTS 侧按标点切句。
+需客户端自行拼接所有 `chunk.text` 以还原完整回复。
 
-### 示例顺序
+#### `done` — 本轮结束
 
-`user_input` → 若干 `chunk` → `done`；`reset` → `reset_ok`。
+```json
+{ "type": "done" }
+```
+
+收到 `done` 后可发送下一条 `user_input`。
+
+#### `reset_ok` — 历史已清空
+
+```json
+{ "type": "reset_ok" }
+```
+
+#### `error` — 错误
+
+```json
+{ "type": "error", "message": "empty text" }
+```
+
+| 触发场景 | `message` 示例 |
+|---------|----------------|
+| 非法 JSON | `"invalid json"` |
+| `text` 为空 | `"empty text"` |
+| 未知 `type` | `"unknown type: foo"` |
+| 流式调用异常 | 异常原始描述 |
+
+收到 `error` 后不保证还有 `done`，建议客户端做超时保护。
+
+---
+
+### 交互流程
+
+```
+客户端                          服务端
+  │── user_input ──────────────►│
+  │◄─ chunk ("今") ─────────────│
+  │◄─ chunk ("天") ─────────────│
+  │◄─ ... ──────────────────────│
+  │◄─ done ─────────────────────│
+  │
+  │── reset ────────────────────►│
+  │◄─ reset_ok ─────────────────│
+```
+
+### 使用约束
+
+- 收到 `done`（或 `error`）后再发下一条 `user_input`；不支持并发穿插。
+- 设计为单连接单会话使用，多连接共享同一历史。
