@@ -13,9 +13,11 @@
 ```json
 {
   "status": "ok",
+  "provider": "local",
   "ready": true,
-  "model": "deepseek-chat",
-  "base_url": "https://api.deepseek.com/v1",
+  "model": "/home/ubuntu/models/Qwen/Qwen3-0___6B",
+  "base_url": "",
+  "device": "cpu",
   "history_items": 4,
   "error": null
 }
@@ -24,9 +26,11 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `status` | string | 固定为 `"ok"` |
+| `provider` | string | 当前模型通道：`local` / `openai` |
 | `ready` | boolean | LLM 客户端是否初始化成功 |
 | `model` | string | 当前使用的模型 ID |
 | `base_url` | string | LLM 网关地址 |
+| `device` | string | 当前设备（本地模式通常是 `cpu` / `cuda`） |
 | `history_items` | integer | 当前历史条数（最大 12） |
 | `error` | string \| null | 最近一次错误信息；无错误时为 `null` |
 
@@ -43,13 +47,14 @@
 #### `user_input` — 发起对话
 
 ```json
-{ "type": "user_input", "text": "今天天气怎么样？" }
+{ "type": "user_input", "text": "今天天气怎么样？", "provider": "local" }
 ```
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `type` | string | `"user_input"` |
 | `text` | string | 用户输入，不能为空 |
+| `provider` | string，可选 | `"local"` 或 `"openai"`；传入后会先尝试切换 provider，再执行本轮推理 |
 
 服务端依次回复若干 `chunk`，最后回复 `done`。
 
@@ -60,6 +65,14 @@
 ```
 
 服务端回复 `reset_ok`，不调用模型。
+
+#### `switch_provider` — 仅切换模型通道
+
+```json
+{ "type": "switch_provider", "provider": "openai" }
+```
+
+服务端成功时返回 `provider_switched`；失败返回 `error`（会附带当前 `provider` 便于客户端回显）。
 
 ---
 
@@ -87,6 +100,12 @@
 { "type": "reset_ok" }
 ```
 
+#### `provider_switched` — 模型通道已切换
+
+```json
+{ "type": "provider_switched", "provider": "local", "message": "switched to local", "ready": true }
+```
+
 #### `error` — 错误
 
 ```json
@@ -97,6 +116,8 @@
 |---------|----------------|
 | 非法 JSON | `"invalid json"` |
 | `text` 为空 | `"empty text"` |
+| provider 非法 | `"provider must be one of: openai, local"` |
+| 切到 openai 但缺配置 | `"LLM_API_KEY/LLM_BASE_URL/LLM_MODEL must be configured for openai mode"` |
 | 未知 `type` | `"unknown type: foo"` |
 | 流式调用异常 | 异常原始描述 |
 
@@ -116,6 +137,9 @@
   │
   │── reset ────────────────────►│
   │◄─ reset_ok ─────────────────│
+  │
+  │── switch_provider(openai) ─►│
+  │◄─ provider_switched ────────│
 ```
 
 ### 使用约束

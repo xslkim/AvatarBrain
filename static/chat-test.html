@@ -68,6 +68,19 @@
       color: var(--text);
       font-size: 0.9rem;
     }
+    select {
+      min-width: 140px;
+      padding: 0.45rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
     input[type="text"]:focus {
       outline: none;
       border-color: var(--accent);
@@ -176,6 +189,14 @@
         <input type="text" id="baseUrl" placeholder="留空则用当前页面来源，例如 http://127.0.0.1:8019" autocomplete="off" />
       </div>
       <div class="row">
+        <label for="providerSelect">模型通道</label>
+        <select id="providerSelect">
+          <option value="local">local（本地）</option>
+          <option value="openai">openai（线上）</option>
+        </select>
+        <button type="button" id="btnSwitchProvider" disabled>切换模型通道</button>
+      </div>
+      <div class="row">
         <button type="button" id="btnConnect">连接</button>
         <button type="button" id="btnDisconnect" disabled>断开</button>
         <button type="button" id="btnHealth">请求 /health</button>
@@ -214,6 +235,8 @@
   const btnDisconnect = $("btnDisconnect");
   const btnHealth = $("btnHealth");
   const btnReset = $("btnReset");
+  const providerSelect = $("providerSelect");
+  const btnSwitchProvider = $("btnSwitchProvider");
   const btnSend = $("btnSend");
   const inputEl = $("input");
   const sendHint = $("sendHint");
@@ -248,6 +271,7 @@
     btnConnect.disabled = connected;
     btnDisconnect.disabled = !connected;
     btnReset.disabled = !connected;
+    btnSwitchProvider.disabled = !connected;
     updateSendState();
   }
 
@@ -338,6 +362,18 @@
         streaming = false;
         assistantBubble = null;
         updateSendState();
+      } else if (type === "provider_switched") {
+        const provider = data.provider != null ? String(data.provider) : "";
+        if (provider) {
+          providerSelect.value = provider;
+        }
+        const msg = document.createElement("div");
+        msg.className = "msg";
+        msg.style.borderLeftColor = "var(--ok)";
+        msg.innerHTML = '<div class="role">系统</div><div class="body"></div>';
+        msg.querySelector(".body").textContent = data.message || ("已切换到 " + provider);
+        chatEl.appendChild(msg);
+        chatEl.scrollTop = chatEl.scrollHeight;
       } else if (type === "error") {
         streaming = false;
         assistantBubble = null;
@@ -371,11 +407,22 @@
     ws.send(payload);
   });
 
+  btnSwitchProvider.addEventListener("click", () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (streaming) {
+      log("skip switch_provider: still streaming");
+      return;
+    }
+    const payload = JSON.stringify({ type: "switch_provider", provider: providerSelect.value });
+    log("-> " + payload);
+    ws.send(payload);
+  });
+
   btnSend.addEventListener("click", () => {
     if (!ws || ws.readyState !== WebSocket.OPEN || streaming) return;
     const text = inputEl.value.trim();
     if (!text) return;
-    const payload = JSON.stringify({ type: "user_input", text: text });
+    const payload = JSON.stringify({ type: "user_input", text: text, provider: providerSelect.value });
     log("-> " + payload);
     appendUser(text);
     streaming = true;
@@ -401,6 +448,9 @@
       const r = await fetch(url);
       const j = await r.json();
       healthOut.textContent = JSON.stringify(j, null, 2);
+      if (j.provider === "local" || j.provider === "openai") {
+        providerSelect.value = j.provider;
+      }
       healthDot.className = "status-dot " + (j.ready ? "on" : "err");
       healthLabel.textContent = j.ready ? "LLM 就绪" : ("未就绪: " + (j.error || ""));
     } catch (err) {

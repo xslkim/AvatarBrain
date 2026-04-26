@@ -13,7 +13,7 @@
 | HTTP / ASGI | FastAPI + Uvicorn |
 | WebSocket | Starlette（FastAPI 内置），文本帧，载荷为单行 JSON |
 | 配置 | pydantic-settings，从环境变量 / `.env` 加载，启动时校验必填项 |
-| LLM | OpenAI Python SDK `AsyncOpenAI`，`base_url` 可指向任意兼容 Chat Completions 的网关 |
+| LLM | 双通道：本地 `transformers` + 线上 OpenAI 兼容 Chat Completions（`AsyncOpenAI`） |
 
 依赖见 [requirements.txt](./requirements.txt)。
 
@@ -32,10 +32,10 @@ AvatarBackend / 浏览器测试页
 │  /health  ──────►  (单例)         │
 │                      │           │
 │                       ▼          │
-│               AsyncOpenAI 流式   │
+│   本地 transformers / AsyncOpenAI │
 └───────────────────────┼──────────┘
                         ▼
-           OpenAI 兼容 Chat Completions API
+      本地模型 或 OpenAI 兼容 Chat Completions API
 ```
 
 **关键约定：**
@@ -48,11 +48,14 @@ AvatarBackend / 浏览器测试页
 
 ## LLM 调用与历史
 
-- **流式接口**：`chat.completions.create(..., stream=True)`。
+- **流式接口**：
+  - 本地模式：`TextIteratorStreamer` 真流式逐 token 推送
+  - 线上模式：`chat.completions.create(..., stream=True)`
 - **消息拼装**：`[system] + history + 当前 user`，system 来自 `LLM_SYSTEM_PROMPT`。
 - **历史容量**：`deque(maxlen=12)`，即最多 **6 轮**（每轮 user + assistant 各 1 条）；超出时自动丢弃最旧项。
 - **历史写入时机**：整段流结束后对 assistant 回复做归一化，归一化结果非空才将当前 user 与归一化后的 assistant 文本写入历史。流式推送给客户端的 `chunk` 是模型原始 delta，与入库文本略有差异。
-- **温度**：配置值在发送前被限制在 `0.1`～`1.2`。
+- **本地生成默认**：低延时档（`do_sample=False`），减少首包和总耗时。
+- **温度**：配置值在发送前被限制在 `0.1`～`1.2`（线上模式生效）。
 - **客户端未就绪**：`AsyncOpenAI` 初始化失败时，`stream_reply` 不产生任何 `chunk`，外层仍会发送 `done`；`/health` 的 `ready` / `error` 字段可用于诊断。
 
 ### Assistant 文本归一化
@@ -73,7 +76,7 @@ AvatarBackend / 浏览器测试页
 | 路径 | 说明 |
 |------|------|
 | `GET /`、`GET /test` | 返回 `static/chat-test.html`，浏览器内测 WebSocket |
-| `GET /health` | JSON 健康状态，含 `ready`、`model`、`history_items`、`error` |
+| `GET /health` | JSON 健康状态，含 `provider`、`ready`、`model`、`base_url`、`history_items`、`error` |
 | `GET /docs` | FastAPI 自动生成的 Swagger UI |
 | `WebSocket /ws/chat` | 流式对话，详见 [API.md](./API.md) |
 
@@ -81,21 +84,22 @@ AvatarBackend / 浏览器测试页
 
 ## 配置（`.env`）
 
-以下三项**必填**，缺少任意一项服务无法启动：
+按 provider 生效的必填项：
 
 | 变量 | 说明 |
 |------|------|
-| `LLM_API_KEY` | 网关 API Key |
-| `LLM_BASE_URL` | 如 `https://api.deepseek.com/v1` |
-| `LLM_MODEL` | 模型 ID，如 `deepseek-chat` |
+| `LLM_PROVIDER` | `local` 或 `openai` |
+| `LLM_LOCAL_MODEL_PATH` | `local` 模式必填，本地模型目录 |
+| `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` | `openai` 模式必填；运行时切到 `openai` 也需要 |
 
 可选项：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `LLM_TIMEOUT` | `20` | 客户端超时（秒） |
-| `LLM_MAX_TOKENS` | `300` | 最大输出 token 数 |
-| `LLM_TEMPERATURE` | `0.55` | 温度，运行时限制在 0.1～1.2 |
+| `LLM_DEVICE` | `auto` | 本地模式设备；可设 `cpu` / `cuda` |
+| `LLM_MAX_TOKENS` | `96` | 最大输出 token 数（越小通常越快） |
+| `LLM_TEMPERATURE` | `0.3` | 温度，运行时限制在 0.1～1.2 |
 | `LLM_SYSTEM_PROMPT` | 内置中文口语提示词 | 覆盖默认系统提示词 |
 | `HTTP_HOST` | `0.0.0.0` | 监听地址；`127.0.0.1` / `localhost` / `::1` 会被自动改为 `0.0.0.0` |
 | `HTTP_PORT` | `8019` | 监听端口 |
@@ -115,7 +119,9 @@ python -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
-# 编辑 .env，填写 LLM_API_KEY、LLM_BASE_URL、LLM_MODEL
+# 编辑 .env：
+# - 本地模式至少配置 LLM_PROVIDER=local + LLM_LOCAL_MODEL_PATH
+# - 若需要运行时切换到 openai，同时填写 LLM_API_KEY、LLM_BASE_URL、LLM_MODEL
 python main.py
 ```
 
@@ -128,6 +134,7 @@ python main.py
 1. **串行发送**：发出 `user_input` 后等到收到 `done`（或 `error`）再发下一条，不要并发穿插。
 2. **单会话**：设计为一路 Backend 长连接使用；多连接或多租户场景需进程级 / 实例级隔离。
 3. **TTS 集成**：可按 `chunk` 增量累积，结合标点分句；收到 `done` 后冲刷剩余缓冲。
+4. **通道切换**：测试页支持 local / openai 一键切换；协议见 `API.md` 的 `switch_provider`。
 
 ---
 

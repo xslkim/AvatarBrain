@@ -63,11 +63,31 @@ async def ws_chat(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type": "reset_ok"}))
                 logger.info("History cleared")
 
+            elif msg_type == "switch_provider":
+                provider = str(data.get("provider", "")).strip().lower()
+                ok, message = llm_service.switch_provider(provider)
+                payload = {"type": "provider_switched", "provider": llm_service.health["provider"]}
+                if ok:
+                    payload["message"] = message
+                    payload["ready"] = llm_service.health["ready"]
+                    await websocket.send_text(json.dumps(payload))
+                    logger.info("Provider switched: %s", llm_service.health["provider"])
+                else:
+                    payload["type"] = "error"
+                    payload["message"] = message
+                    await websocket.send_text(json.dumps(payload))
+
             elif msg_type == "user_input":
                 text = str(data.get("text", "")).strip()
                 if not text:
                     await websocket.send_text(json.dumps({"type": "error", "message": "empty text"}))
                     continue
+                requested_provider = str(data.get("provider", "")).strip().lower()
+                if requested_provider:
+                    ok, message = llm_service.switch_provider(requested_provider)
+                    if not ok:
+                        await websocket.send_text(json.dumps({"type": "error", "message": message}))
+                        continue
                 logger.info("LLM input: %.60s", text)
                 try:
                     async for token in llm_service.stream_reply(text):

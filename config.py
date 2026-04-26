@@ -5,16 +5,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
-
+#sk-48d08afe6bd94e8faca8e411dd7e4157
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    @field_validator("llm_api_key", "llm_base_url", "llm_model", mode="before")
+    @field_validator("llm_provider", mode="before")
     @classmethod
-    def llm_required_nonempty(cls, value: str) -> str:
-        text = str(value or "").strip()
-        if not text:
-            raise ValueError("LLM_API_KEY, LLM_BASE_URL and LLM_MODEL must be set (non-empty).")
+    def normalize_provider(cls, value: str) -> str:
+        text = str(value or "openai").strip().lower()
+        if text not in {"openai", "local"}:
+            raise ValueError("LLM_PROVIDER must be one of: openai, local")
         return text
 
     @field_validator("http_host", mode="before")
@@ -36,9 +36,12 @@ class Settings(BaseSettings):
             p = PROJECT_ROOT / p
         return str(p.resolve())
 
-    llm_api_key: str = Field(..., validation_alias="LLM_API_KEY")
-    llm_base_url: str = Field(..., validation_alias="LLM_BASE_URL")
-    llm_model: str = Field(..., validation_alias="LLM_MODEL")
+    llm_provider: str = Field(default="openai", validation_alias="LLM_PROVIDER")
+    llm_api_key: str = Field(default="", validation_alias="LLM_API_KEY")
+    llm_base_url: str = Field(default="", validation_alias="LLM_BASE_URL")
+    llm_model: str = Field(default="", validation_alias="LLM_MODEL")
+    llm_local_model_path: str = Field(default="", validation_alias="LLM_LOCAL_MODEL_PATH")
+    llm_device: str = Field(default="auto", validation_alias="LLM_DEVICE")
     llm_timeout: int = 20
     llm_max_tokens: int = 300
     llm_temperature: float = 0.55
