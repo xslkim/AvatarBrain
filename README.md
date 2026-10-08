@@ -1,5 +1,7 @@
 # AvatarBrain
 
+> **部署新机器？** 请先阅读完整指南：[DEPLOY.md](./DEPLOY.md)（含 Git LFS 模型、环境变量、启动顺序与排障）。
+
 面向数字人 / 语音助手的 **LLM 大脑服务**。上行接收文本，下行通过 **WebSocket JSON 文本帧**流式推送模型输出，便于与上游 ASR、下游 TTS 低延迟串联。会话内保留多轮历史，系统提示词针对中文口语和语音播报优化。
 
 **默认端口**：`8019`　　**API 文档**：[API.md](./API.md)　　**使用教程**：[USAGE_GUIDE.md](./USAGE_GUIDE.md)
