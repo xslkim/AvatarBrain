@@ -88,7 +88,7 @@ git clone git@github.com:xslkim/AvatarFront.git
 ls -lh AvatarBackend/models/asr/SenseVoiceSmall/model.pt
 ls -lh AvatarBackend/models/tts/Kokoro-82M/kokoro-v1_1-zh.pth
 ls -lh AvatarBrain/models/Qwen/Qwen3-0___6B/model.safetensors
-ls -lh AvatarFront/models/Sakurada_Fumiriya.vrm
+ls -lh AvatarFront/models/JiangJieYuan20261008.vrm
 ```
 
 HTTPS clone 亦可：
@@ -119,7 +119,7 @@ git clone https://github.com/xslkim/AvatarFront.git
 
 | 路径 | 用途 |
 |------|------|
-| `models/Sakurada_Fumiriya.vrm` | 当前唯一内置 3D 角色（默认） |
+| `models/JiangJieYuan20261008.vrm` | 当前唯一内置 3D 角色（默认 JiangJieYuan） |
 
 > 额外角色可放到 `models/` 后在页面「模型 URL」加载，或改 `app.js` 的 `BUILTIN_AVATAR_CHOICES`。
 
@@ -138,7 +138,7 @@ rsync -avP AvatarBackend/models/tts/Kokoro-82M/        NEW:/path/AvatarBackend/m
 rsync -avP AvatarBrain/models/Qwen/Qwen3-0___6B/       NEW:/path/AvatarBrain/models/Qwen/Qwen3-0___6B/
 
 # Front 默认 3D
-rsync -avP AvatarFront/models/Sakurada_Fumiriya.vrm \
+rsync -avP AvatarFront/models/JiangJieYuan20261008.vrm \
   NEW:/path/AvatarFront/models/
 ```
 
@@ -147,7 +147,7 @@ rsync -avP AvatarFront/models/Sakurada_Fumiriya.vrm \
 - `SenseVoiceSmall/model.pt` ≈ **893 MB**
 - `Kokoro-82M/kokoro-v1_1-zh.pth` ≈ **313 MB**
 - `Qwen3-0___6B/model.safetensors` ≈ **1.5 GB**
-- `models/Sakurada_Fumiriya.vrm` ≈ **19 MB**
+- `models/JiangJieYuan20261008.vrm` ≈ **16 MB**
 
 ---
 
@@ -336,7 +336,7 @@ cd "$WORKDIR/AvatarFront"
 浏览器打开：`https://<服务器IP或域名>:8181/`
 
 1. 信任证书  
-2. 选择 3D 角色（默认 Sakurada）  
+2. 选择 3D 角色（默认 JiangJieYuan）  
 3. 点击「连接语音通道」授权麦克风  
 4. 也可直接在输入框发文本走 `/chat/text`
 
