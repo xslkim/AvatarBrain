@@ -88,7 +88,7 @@ git clone git@github.com:xslkim/AvatarFront.git
 ls -lh AvatarBackend/models/asr/SenseVoiceSmall/model.pt
 ls -lh AvatarBackend/models/tts/Kokoro-82M/kokoro-v1_1-zh.pth
 ls -lh AvatarBrain/models/Qwen/Qwen3-0___6B/model.safetensors
-ls -lh AvatarFront/models/downloads/vrm-samples/vroid/beta/Sakurada_Fumiriya.vrm
+ls -lh AvatarFront/models/Sakurada_Fumiriya.vrm
 ```
 
 HTTPS clone 亦可：
@@ -115,17 +115,13 @@ git clone https://github.com/xslkim/AvatarFront.git
 |------|------|
 | `models/Qwen/Qwen3-0___6B/` | 本地 LLM（`LLM_PROVIDER=local`） |
 
-**AvatarFront（约 300 MB）**
+**AvatarFront（约 19 MB）**
 
 | 路径 | 用途 |
 |------|------|
-| `models/VRM1_Constraint_Twist_Sample.vrm` | 官方示例角色 |
-| `models/downloads/vrm-samples/...` | 预设 VRM（默认 Sakurada Fumiriya） |
-| `models/downloads/extra/bundled/*.vrm` | 机器人 / 样例等 |
-| `models/downloads/vrm-sample-models/human_male/human_male.vrm` | 男性标准体 |
-| `models/downloads/univrm-test-models/AliciaSolid_vrm-0.51.vrm` | Alicia |
+| `models/Sakurada_Fumiriya.vrm` | 当前唯一内置 3D 角色（默认） |
 
-> Front 已不再依赖 git submodule；无需 `git submodule update`。
+> 额外角色可放到 `models/` 后在页面「模型 URL」加载，或改 `app.js` 的 `BUILTIN_AVATAR_CHOICES`。
 
 ### 3.2 LFS 拉取失败时的最小文件清单
 
@@ -141,9 +137,9 @@ rsync -avP AvatarBackend/models/tts/Kokoro-82M/        NEW:/path/AvatarBackend/m
 # Brain 本地 LLM（仅 LLM_PROVIDER=local 时需要）
 rsync -avP AvatarBrain/models/Qwen/Qwen3-0___6B/       NEW:/path/AvatarBrain/models/Qwen/Qwen3-0___6B/
 
-# Front 默认 3D（至少一个）
-rsync -avP AvatarFront/models/downloads/vrm-samples/vroid/beta/Sakurada_Fumiriya.vrm \
-  NEW:/path/AvatarFront/models/downloads/vrm-samples/vroid/beta/
+# Front 默认 3D
+rsync -avP AvatarFront/models/Sakurada_Fumiriya.vrm \
+  NEW:/path/AvatarFront/models/
 ```
 
 必检文件大小（约值）：
@@ -151,7 +147,7 @@ rsync -avP AvatarFront/models/downloads/vrm-samples/vroid/beta/Sakurada_Fumiriya
 - `SenseVoiceSmall/model.pt` ≈ **893 MB**
 - `Kokoro-82M/kokoro-v1_1-zh.pth` ≈ **313 MB**
 - `Qwen3-0___6B/model.safetensors` ≈ **1.5 GB**
-- `Sakurada_Fumiriya.vrm` ≈ **19 MB**
+- `models/Sakurada_Fumiriya.vrm` ≈ **19 MB**
 
 ---
 
