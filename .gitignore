@@ -11,3 +11,7 @@ __pychahe__/
 .coverage.*
 htmlcov/
 .DS_Store
+.env
+server.log
+server.pid
+models/**/.cache/
