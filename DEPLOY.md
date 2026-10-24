@@ -88,7 +88,7 @@ git clone git@github.com:xslkim/AvatarFront.git
 ls -lh AvatarBackend/models/asr/SenseVoiceSmall/model.pt
 ls -lh AvatarBackend/models/tts/Kokoro-82M/kokoro-v1_1-zh.pth
 ls -lh AvatarBrain/models/Qwen/Qwen3-0___6B/model.safetensors
-ls -lh AvatarFront/models/JiangJieYuan20261008.vrm
+ls -lh AvatarFront/models/business-presenter-ref.vrm
 ```
 
 HTTPS clone 亦可：
@@ -115,11 +115,11 @@ git clone https://github.com/xslkim/AvatarFront.git
 |------|------|
 | `models/Qwen/Qwen3-0___6B/` | 本地 LLM（`LLM_PROVIDER=local`） |
 
-**AvatarFront（约 19 MB）**
+**AvatarFront（约 1 GB，含多个 VRM/GLB 角色）**
 
 | 路径 | 用途 |
 |------|------|
-| `models/JiangJieYuan20261008.vrm` | 当前唯一内置 3D 角色（默认 JiangJieYuan） |
+| `models/business-presenter-ref.vrm` | 当前默认 3D 角色（商务男模，约 13 MB） |
 
 > 额外角色可放到 `models/` 后在页面「模型 URL」加载，或改 `app.js` 的 `BUILTIN_AVATAR_CHOICES`。
 
@@ -138,7 +138,7 @@ rsync -avP AvatarBackend/models/tts/Kokoro-82M/        NEW:/path/AvatarBackend/m
 rsync -avP AvatarBrain/models/Qwen/Qwen3-0___6B/       NEW:/path/AvatarBrain/models/Qwen/Qwen3-0___6B/
 
 # Front 默认 3D
-rsync -avP AvatarFront/models/JiangJieYuan20261008.vrm \
+rsync -avP AvatarFront/models/business-presenter-ref.vrm \
   NEW:/path/AvatarFront/models/
 ```
 
@@ -147,7 +147,7 @@ rsync -avP AvatarFront/models/JiangJieYuan20261008.vrm \
 - `SenseVoiceSmall/model.pt` ≈ **893 MB**
 - `Kokoro-82M/kokoro-v1_1-zh.pth` ≈ **313 MB**
 - `Qwen3-0___6B/model.safetensors` ≈ **1.5 GB**
-- `models/JiangJieYuan20261008.vrm` ≈ **16 MB**
+- `models/business-presenter-ref.vrm` ≈ **13 MB**
 
 ---
 
@@ -161,9 +161,9 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 pip install -r requirements.txt
-# 本地 LLM 另需：
-pip install torch transformers accelerate sentencepiece
-# 有 GPU 时安装对应 CUDA 版 torch，参见 https://pytorch.org
+# 仅本地 LLM（LLM_PROVIDER=local）需要：
+pip install -r requirements-local.txt
+# 有 GPU 时先安装对应 CUDA 版 torch，参见 https://pytorch.org
 deactivate
 ```
 

@@ -1,0 +1,6 @@
+# 仅 LLM_PROVIDER=local 时需要；OpenAI 兼容 API 模式不需要。
+# GPU 机器请先按 https://pytorch.org 安装与 CUDA 匹配的 torch。
+torch
+transformers
+accelerate
+sentencepiece
